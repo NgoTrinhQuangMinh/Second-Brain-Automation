@@ -128,6 +128,20 @@ Run from the project directory:
 .venv/Scripts/python.exe -m ruff check src tests
 ```
 
+## Remote API preparation (7 October 2026)
+
+- Added `src/brain_loader/api.py`: authenticated `POST /search`, public `GET /health`,
+  and interactive `/docs`. This uses the existing semantic index and namespace.
+- Added a search-only Dockerfile, `requirements-api.txt`, Railway healthcheck config,
+  and upload exclusions for credentials, local data, and caches.
+- `SEARCH_API_KEY` is generated and saved in ignored `.env`; clients use this bearer
+  token, while the Pinecone key remains on the server.
+- `scripts/configure_railway_api.py` transfers only search settings to a linked Railway
+  service through stdin without printing keys. README includes deployment/API examples.
+- Verified 26 passing tests, clean Ruff, and a live API request returning three Pinecone hits.
+- Railway sign-in is required before actual deployment; no public service URL yet.
+- Local ingestion and semantic-only retrieval are retained; no keyword index was added.
+
 ## Retrieval, cost, and remaining limitations
 
 The current query command performs semantic retrieval through Pinecone's integrated embeddings. It returns matching source text and metadata. Exact keyword/phrase search and hybrid retrieval have not been implemented. Quoting a query does not make it an exact-text search. GPT answer generation is also separate from the current retrieval command.

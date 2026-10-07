@@ -66,6 +66,64 @@ Secrets and document data are ignored by Git.
 The historical `ai.py`, `manual.py` and manual-review scripts are retained but
 are not called by the current source-only ingestion path.
 
+## Remote search API (Railway)
+
+The API searches the existing Pinecone collection using semantic retrieval. Ingestion
+still runs locally with `brain-loader sync`; uploaded changes are available to the API.
+The Railway container installs only search dependencies, with no document/model caches.
+
+Deploy the Dockerfile with these Railway service variables:
+`PINECONE_API_KEY`, `PINECONE_INDEX=second-brain`,
+`PINECONE_NAMESPACE=my-documents`, `PINECONE_TEXT_FIELD=chunk_text`, and
+`SEARCH_API_KEY` (a random secret of at least 32 characters). Keep keys out of Git.
+Railway supplies `PORT`. Generate a public domain for the service.
+
+CLI deployment from this project directory:
+
+```powershell
+npx --yes @railway/cli login
+npx --yes @railway/cli init --name second-brain-api
+npx --yes @railway/cli add --service search-api
+.venv/Scripts/python.exe scripts/configure_railway_api.py --service search-api
+npx --yes @railway/cli up --service search-api --detach
+npx --yes @railway/cli domain --service search-api --port 8000
+```
+
+The configuration helper copies only the search settings from `.env`, creates a
+search token if needed, and saves it there without printing credentials.
+
+Endpoints:
+
+- `GET /health`: unauthenticated readiness check.
+- `GET /docs`: interactive API documentation. Click **Authorize** and enter your
+  `SEARCH_API_KEY` to try a search.
+- `POST /search`: requires `Authorization: Bearer YOUR_SEARCH_API_KEY`.
+  Send JSON with `query` (1-8000 characters, nonblank) and `top_k` (1-50, default 5).
+  Returns Pinecone's result, including `result.hits`, `_id`, `_score`, and source `fields`.
+  This retrieves passages; it does not generate an answer or perform keyword search.
+
+```bash
+curl -X POST "https://YOUR-RAILWAY-DOMAIN/search" \
+  -H "Authorization: Bearer YOUR_SEARCH_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"how does text classification work?","top_k":5}'
+```
+
+```powershell
+$headers = @{ Authorization = "Bearer $env:SEARCH_API_KEY" }
+$body = @{ query = "how does text classification work?"; top_k = 5 } | ConvertTo-Json
+Invoke-RestMethod -Uri "https://YOUR-RAILWAY-DOMAIN/search" -Method Post `
+  -Headers $headers -ContentType "application/json" -Body $body
+```
+
+Errors: `401` for an invalid/missing bearer token, `422` for invalid request input,
+and `502` if Pinecone search fails. Use the search API token on client devices;
+keep the Pinecone key on Railway. Server-to-server clients and `/docs` work directly;
+cross-origin browser apps need an explicit CORS configuration.
+
+To run locally: install `requirements-api.txt`, set `SEARCH_API_KEY`, then run
+`.venv/Scripts/python.exe -m uvicorn brain_loader.api:app --host 127.0.0.1 --port 8000`.
+
 ## Checks
 
 ```powershell
