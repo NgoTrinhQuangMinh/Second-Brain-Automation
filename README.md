@@ -72,6 +72,12 @@ The API searches the existing Pinecone collection using semantic retrieval. Inge
 still runs locally with `brain-loader sync`; uploaded changes are available to the API.
 The Railway container installs only search dependencies, with no document/model caches.
 
+Production URL: https://search-api-production-837d.up.railway.app
+Interactive documentation: https://search-api-production-837d.up.railway.app/docs
+Retrieve `SEARCH_API_KEY` from your ignored local `.env` or the Railway service variables.
+In `/docs`, enter just the token in **Authorize**; Swagger adds the `Bearer` prefix.
+Do not use the Pinecone key as a client token.
+
 Deploy the Dockerfile with these Railway service variables:
 `PINECONE_API_KEY`, `PINECONE_INDEX=second-brain`,
 `PINECONE_NAMESPACE=my-documents`, `PINECONE_TEXT_FIELD=chunk_text`, and
@@ -103,7 +109,7 @@ Endpoints:
   This retrieves passages; it does not generate an answer or perform keyword search.
 
 ```bash
-curl -X POST "https://YOUR-RAILWAY-DOMAIN/search" \
+curl -X POST "https://search-api-production-837d.up.railway.app/search" \
   -H "Authorization: Bearer YOUR_SEARCH_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"query":"how does text classification work?","top_k":5}'
@@ -112,7 +118,7 @@ curl -X POST "https://YOUR-RAILWAY-DOMAIN/search" \
 ```powershell
 $headers = @{ Authorization = "Bearer $env:SEARCH_API_KEY" }
 $body = @{ query = "how does text classification work?"; top_k = 5 } | ConvertTo-Json
-Invoke-RestMethod -Uri "https://YOUR-RAILWAY-DOMAIN/search" -Method Post `
+Invoke-RestMethod -Uri "https://search-api-production-837d.up.railway.app/search" -Method Post `
   -Headers $headers -ContentType "application/json" -Body $body
 ```
 

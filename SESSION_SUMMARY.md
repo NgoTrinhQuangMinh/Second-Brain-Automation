@@ -139,7 +139,17 @@ Run from the project directory:
 - `scripts/configure_railway_api.py` transfers only search settings to a linked Railway
   service through stdin without printing keys. README includes deployment/API examples.
 - Verified 26 passing tests, clean Ruff, and a live API request returning three Pinecone hits.
-- Railway sign-in is required before actual deployment; no public service URL yet.
+- Deployed successfully to Railway project `second-brain-api`, service `search-api`.
+- Public URL: https://search-api-production-837d.up.railway.app
+- API documentation: https://search-api-production-837d.up.railway.app/docs
+- Railway project ID: `bacceaf8-b885-4e05-801c-d1e377d8916e`.
+- User explicitly approved uploading `PINECONE_API_KEY` and `SEARCH_API_KEY` as private
+  service variables. No Drive or OpenAI credentials were uploaded.
+- Remote checks passed: health/docs HTTP 200, missing token HTTP 401, authenticated
+  search HTTP 200 with three hits and all seven source metadata fields.
+- Deployment uses CLI uploads; redeploy code with
+  `npx --yes @railway/cli up --service search-api --detach` from this linked directory.
+  GitHub autodeployment is not configured. No persistent local data volume is needed.
 - Local ingestion and semantic-only retrieval are retained; no keyword index was added.
 
 ## Retrieval, cost, and remaining limitations
