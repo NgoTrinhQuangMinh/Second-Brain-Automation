@@ -1,0 +1,39 @@
+# Only the eight top-level fields below are allowed in an uploaded record.
+# Reject extra fields. Do not invent source facts, descriptions, or topics.
+# Do not call GPT to describe figures.
+# For figures, use the nearest text block in the same section: preceding text
+# first, otherwise following text. If neither exists, use empty text and topics.
+# Keep tables and figures whole. Split only prose.
+
+_id: |
+  A unique, deterministic record identifier derived from the source document,
+  revision, and chunk position. A figure must have its own identifier.
+
+chunk_text: |
+  For text: the extracted source text, without generated additions.
+  For table: the complete extracted table, without splitting or summarizing it.
+  For figure: copy the selected neighboring text block verbatim. Do not generate
+  a figure description or infer information from the image.
+
+content_type: [table, figure, text]
+
+filename: |
+  Copy the exact source filename from Google Drive. Do not rename it.
+
+drive_path: |
+  Copy the source path returned by the Drive inventory.
+
+source_url: |
+  Use the source Google Drive URL. If absent, construct the standard Drive file
+  URL from the actual source file ID. Do not invent a source location.
+
+pages: |
+  List the actual source page numbers represented by this chunk.
+  For a figure, use the figure's own pages, not the neighboring text's pages.
+  Use an empty list when page numbers are unavailable.
+
+topics: |
+  Use only topic phrases explicitly present in source headings or source text.
+  Do not add inferred categories, synonyms, translations, or generated topics.
+  For a figure, copy the selected neighboring text block's topics.
+  Use an empty list when no explicit topic phrase is available.
