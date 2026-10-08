@@ -1,4 +1,4 @@
-"""Copy only search settings to a linked Railway API service without printing secrets."""
+"""Configure the linked Railway document API without printing credentials."""
 
 import argparse
 import os
@@ -23,6 +23,11 @@ def main():
         "PINECONE_TEXT_FIELD": os.getenv("PINECONE_TEXT_FIELD", "chunk_text"),
         "SEARCH_API_KEY": os.getenv("SEARCH_API_KEY", ""),
         "PORT": "8000",
+        "DATA_DIR": "/data",
+        "DRIVE_FOLDER_ID": os.getenv("DRIVE_FOLDER_ID", ""),
+        "CHUNK_CHARS": os.getenv("CHUNK_CHARS", "2800"),
+        "OCR_LANG": os.getenv("OCR_LANG", "iso:en"),
+        "OCR_MODEL_SIZE": os.getenv("OCR_MODEL_SIZE", "tiny"),
     }
     if not values["PINECONE_API_KEY"] or not values["PINECONE_INDEX"]:
         raise SystemExit("Configure PINECONE_API_KEY and PINECONE_INDEX in .env first")
@@ -44,7 +49,7 @@ def main():
             # CLI diagnostics may include submitted values; do not echo them.
             raise SystemExit(f"Could not set {name}; check Railway sign-in and linked service")
         print(f"Configured {name}")
-    print("Search token saved in ignored .env; no Drive or OpenAI credentials uploaded.")
+    print("API token saved in ignored .env; no Drive or OpenAI credentials uploaded.")
 
 
 if __name__ == "__main__":

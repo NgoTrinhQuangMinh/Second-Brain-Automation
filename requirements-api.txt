@@ -3,3 +3,7 @@ uvicorn>=0.34,<1
 pinecone>=7,<9
 python-dotenv>=1,<2
 PyYAML>=6,<7
+python-multipart>=0.0.20,<1
+filelock>=3.16,<4
+docling==2.134.0
+onnxruntime>=1.20,<2

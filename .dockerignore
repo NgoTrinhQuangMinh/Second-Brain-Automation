@@ -1,6 +1,7 @@
 *
 !Dockerfile
 !requirements-api.txt
+!label_rules.yaml
 !src/
 !src/**
 **/__pycache__/

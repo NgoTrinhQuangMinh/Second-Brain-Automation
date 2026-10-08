@@ -68,9 +68,13 @@ are not called by the current source-only ingestion path.
 
 ## Remote search API (Railway)
 
-The API searches the existing Pinecone collection using semantic retrieval. Ingestion
-still runs locally with `brain-loader sync`; uploaded changes are available to the API.
-The Railway container installs only search dependencies, with no document/model caches.
+The API searches the existing Pinecone collection using semantic retrieval and accepts
+document uploads for ingestion/update and deletion. You detect Drive changes and send
+the actual files; the API never inventories Drive and needs no Google credentials.
+The Railway service runs Docling on CPU and uses a `/data` volume for its durable job
+queue, manifest, uploads, and extraction artifacts. PDF layout/table model weights
+are preloaded into the container image to preserve space on the data volume.
+The current volume is 500 MB; larger document collections require more capacity.
 
 Production URL: https://search-api-production-837d.up.railway.app
 Interactive documentation: https://search-api-production-837d.up.railway.app/docs
@@ -81,7 +85,9 @@ Do not use the Pinecone key as a client token.
 Deploy the Dockerfile with these Railway service variables:
 `PINECONE_API_KEY`, `PINECONE_INDEX=second-brain`,
 `PINECONE_NAMESPACE=my-documents`, `PINECONE_TEXT_FIELD=chunk_text`, and
-`SEARCH_API_KEY` (a random secret of at least 32 characters). Keep keys out of Git.
+`SEARCH_API_KEY` (a random secret of at least 32 characters). For ingestion, retain
+`DATA_DIR=/data`, the original `DRIVE_FOLDER_ID` (manifest scope only), `CHUNK_CHARS=2800`,
+`OCR_LANG=iso:en`, and `OCR_MODEL_SIZE=tiny`. Keep keys out of Git.
 Railway supplies `PORT`. Generate a public domain for the service.
 
 CLI deployment from this project directory:
@@ -107,6 +113,54 @@ Endpoints:
   Send JSON with `query` (1-8000 characters, nonblank) and `top_k` (1-50, default 5).
   Returns Pinecone's result, including `result.hits`, `_id`, `_score`, and source `fields`.
   This retrieves passages; it does not generate an answer or perform keyword search.
+- `POST /documents`: authenticated multipart file ingestion/update, returns HTTP 202
+  and a `job_id`. Required fields: `document_id` (use the stable Drive file ID) and
+  `file` (the actual bytes, with original filename). Optional: `drive_path` and
+  `source_url`; absent URLs use the standard Drive URL constructed from the ID.
+  Supported extensions match the loader. Maximum file size: 100 MiB.
+- `GET /jobs/{job_id}`: authenticated job status: `queued`, `running`, `succeeded`,
+  or `failed`. Stages include `parsing`, `uploading`, and `deleting_old_revision`.
+  A successful ingestion returns `revision_id`, `records`, `deleted_records`,
+  and `unchanged`. HTTP 202 means accepted, not completed; poll until terminal status.
+- `DELETE /documents/{document_id}`: authenticated deletion job, HTTP 202. Removes
+  active and pending chunks belonging to that ID. Unknown IDs are a no-op (zero records).
+- `POST /admin/import-manifest`: authenticated, one-time bootstrap of existing IDs;
+  refuses to overwrite a nonempty manifest. This initializes existing local documents
+  without uploading their content or re-embedding them.
+
+All protected endpoints use the same `SEARCH_API_KEY`; its holders can also ingest
+and delete documents. Do not share it with users who should only have search access.
+
+Use the same `document_id` when a file changes. The server uploads the new revision
+first and deletes obsolete chunks only after the complete upload succeeds; you do
+not send a separate delete request for an update. Identical successful uploads are
+skipped. Failures retain the manifest journal; resubmit the same file to retry.
+One worker processes jobs in order, outside the search process. Jobs interrupted by
+a deployment resume from the durable queue. Run one Railway replica.
+
+```bash
+# Ingest a new document, or replace its existing revision.
+curl -X POST "https://search-api-production-837d.up.railway.app/documents" \
+  -H "Authorization: Bearer YOUR_SEARCH_API_KEY" \
+  -F "document_id=YOUR_DRIVE_FILE_ID" \
+  -F "file=@/path/to/document.pdf" \
+  -F "drive_path=Course/document.pdf"
+
+# Check completion using the returned job_id.
+curl "https://search-api-production-837d.up.railway.app/jobs/JOB_ID" \
+  -H "Authorization: Bearer YOUR_SEARCH_API_KEY"
+
+# Remove a deleted document (then poll the returned job_id).
+curl -X DELETE "https://search-api-production-837d.up.railway.app/documents/YOUR_DRIVE_FILE_ID" \
+  -H "Authorization: Bearer YOUR_SEARCH_API_KEY"
+```
+
+Export Google Docs/Slides to PDF and Sheets to XLSX before uploading. A private Drive
+URL alone is not an ingestion input. The server stores your file and extraction artifacts
+on its private volume. Monitor disk usage and allow time for initial model downloads
+and large PDF processing. Pinecone updates are eventually consistent.
+Use Railway as the ingestion writer once migrated; a local sync has an independent
+manifest and cannot safely coordinate updates with the remote writer.
 
 ```bash
 curl -X POST "https://search-api-production-837d.up.railway.app/search" \
@@ -123,7 +177,8 @@ Invoke-RestMethod -Uri "https://search-api-production-837d.up.railway.app/search
 ```
 
 Errors: `401` for an invalid/missing bearer token, `422` for invalid request input,
-and `502` if Pinecone search fails. Use the search API token on client devices;
+`413` for oversized uploads, `415` for unsupported file extensions, `429` for a full
+job queue, and `502` if Pinecone search fails. Use the search API token on client devices;
 keep the Pinecone key on Railway. Server-to-server clients and `/docs` work directly;
 cross-origin browser apps need an explicit CORS configuration.
 

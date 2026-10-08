@@ -149,8 +149,43 @@ Run from the project directory:
   search HTTP 200 with three hits and all seven source metadata fields.
 - Deployment uses CLI uploads; redeploy code with
   `npx --yes @railway/cli up --service search-api --detach` from this linked directory.
-  GitHub autodeployment is not configured. No persistent local data volume is needed.
+  GitHub autodeployment is not configured. The later ingestion deployment adds a persistent volume.
 - Local ingestion and semantic-only retrieval are retained; no keyword index was added.
+
+## Remote ingestion and deletion (8 October 2026)
+
+- Deployed authenticated `POST /documents` (multipart file upload),
+  `GET /jobs/{job_id}` (job progress/result), and `DELETE /documents/{document_id}`.
+- User handles Drive change detection. The server never inventories Drive and no
+  Google credentials were uploaded. Use the actual file bytes and stable Drive ID.
+- Optional upload metadata: `drive_path` and `source_url`. Original filename comes
+  from the multipart upload. Maximum file size is 100 MiB.
+- New/changed documents are queued. Replacement uploads complete before old record
+  IDs are removed. The manifest journals active/pending IDs for retries and recovery.
+- Deletion is a separate queued operation; unknown document IDs delete zero records.
+- Jobs run serially in isolated child processes and persist in `/data/jobs.sqlite3`.
+  Jobs interrupted by restarts resume. Run one replica and use the remote API as the
+  ingestion writer; the independent local manifest cannot coordinate remote updates.
+- Added Railway volume `search-api-volume` (ID `0ad10c43-d10c-4045-8425-77b2d662be9d`),
+  mounted at `/data`, with 500 MB capacity for the manifest, jobs, uploads, and artifacts.
+- User explicitly approved transferring the local ingestion manifest to Railway.
+  Imported nine documents and 2,659 active record IDs through authenticated
+  `POST /admin/import-manifest`, which refuses to overwrite a nonempty manifest.
+  The manifest contains record IDs/revisions, not credentials or document content.
+- Docling PDF layout/table weights are preloaded into the Docker image under
+  `/app/model-cache`, preventing model downloads from filling the data volume.
+  Runtime HF downloads are disabled; RapidOCR English tiny weights download separately.
+- Persistent data includes original uploaded files and extraction artifacts. Monitor
+  volume capacity for larger collections; model weights do not consume that volume.
+- The same `SEARCH_API_KEY` authorizes search, ingestion, deletion, and manifest import.
+  Only share it with clients permitted to modify the collection.
+- Verified 33 passing tests and clean Ruff. Live text and one-page PDF tests verified
+  ingestion, replacement, deletion, and eventual record presence/absence via Pinecone
+  fetches. Synthetic test records were removed afterward.
+- Current verified deployment ID: `de731221-c575-4e2c-8067-554a0ef86ef9`.
+- Helpers: `scripts/import_railway_manifest.py` (bootstrap),
+  `scripts/smoke_documents_api.py` (temporary live test and cleanup), and
+  `scripts/configure_railway_api.py` (service variables without printing keys).
 
 ## Retrieval, cost, and remaining limitations
 
